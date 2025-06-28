@@ -1,0 +1,22 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:15
+    container_name: cartchef-db
+    environment:
+      POSTGRES_USER: cartchef
+      POSTGRES_PASSWORD: chefpass
+      POSTGRES_DB: chefdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - cartchef_net
+
+volumes:
+  pgdata:
+
+networks:
+  cartchef_net:
