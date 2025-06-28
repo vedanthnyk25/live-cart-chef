@@ -8,7 +8,7 @@ This is the backend API service for **Live Cart Chef**, built for Walmart Sparka
 
 - REST APIs for products, cart, and suggestions (WIP)
 - PostgreSQL integration via Docker Compose
-- Graceful shutdown with animated terminal output
+- Graceful shutdown with connection pooling 
 - Organized, extensible project structure
 - Simple Makefile for common dev tasks
 
