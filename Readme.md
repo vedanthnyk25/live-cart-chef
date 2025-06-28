@@ -24,9 +24,8 @@ This is the backend API service for **Live Cart Chef**, built for Walmart Sparka
 
 ## 🚀 Getting Started
 
-### 1. Clone the repo
-
 ```bash
+### 1. Clone the repo
 git clone https://github.com/your-org/live-cart-chef.git
 cd live-cart-chef/backend
 
