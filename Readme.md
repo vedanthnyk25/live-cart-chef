@@ -33,23 +33,17 @@ cd live-cart-chef/backend
 cp .env.example .env
 
 ### 3. Start PostgreSQL with Docker Compose
-
-```bash
 docker-compose up -d
 
 ### 4. Run the server
 ###Make sure you are in backend directory
-```bash
 option-1: Using Go directly
-```bash
 go run cmd/server/main.go
 
 option-2: Using Makefile
-```bash
 make run
 
 ###Server will start at: http://localhost:8080
 
 ### 5.Terminate the server
-```bash
 ctrl + C
