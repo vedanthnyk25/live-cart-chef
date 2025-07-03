@@ -2,15 +2,17 @@ package main
 
 import (
 	"backend/internal/db"
+	"backend/internal/routes"
 	"context"
-	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 )
 
 // Handle graceful shutdown with spinner
@@ -23,12 +25,8 @@ func main() {
 	
 	r := gin.Default()
 
-	// Root route
-	r.GET("/", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"message": "Welcome to the backend API!",
-		})
-	})
+	// Routes
+	routes.SetupRoutes(r)
 
 	srv := &http.Server{
 		Addr:    ":8080",
