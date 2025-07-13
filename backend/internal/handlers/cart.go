@@ -3,41 +3,46 @@ package handlers
 import (
 	"backend/internal/db"
 	"backend/internal/models"
-	"bytes"
-	"encoding/json"
+	// "bytes"
+	// "encoding/json"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
 
 // Helper function to call suggestions endpoint
-func callSuggestionsEndpoint(userID uint) {
+func callSuggestionsEndpoint(userID uint, authToken string) {
 	// Get the base URL (assuming it's the same server)
 	baseURL := os.Getenv("BASE_URL")
 	if baseURL == "" {
 		baseURL = "http://localhost:8080" // Default fallback
 	}
 
-	// Prepare request body for suggestions endpoint
-	reqBody := map[string]interface{}{
-		"user_id": userID,
-	}
-
-	body, err := json.Marshal(reqBody)
-	if err != nil {
-		// Log error but don't fail the cart operation
-		return
-	}
-
 	// Make async call to suggestions endpoint
 	go func() {
-		http.Post(baseURL+"/api/suggestions", "application/json", bytes.NewBuffer(body))
+		// Create HTTP GET request
+		req, err := http.NewRequest("GET", baseURL+"/api/suggestions", nil)
+		if err != nil {
+			return
+		}
+
+		// Set Authorization header
+		req.Header.Set("Authorization", "Bearer "+authToken)
+
+		// Make the request
+		client := &http.Client{}
+		client.Do(req)
 	}()
 }
 
 func AddToCart(c *gin.Context) {
 	userID := c.MustGet("user_id").(uint)
+
+	// Get auth token from request header
+	authHeader := c.GetHeader("Authorization")
+	authToken := strings.TrimPrefix(authHeader, "Bearer ")
 
 	var input struct {
 		ProductID uint `json:"product_id" binding:"required"`
@@ -74,7 +79,7 @@ func AddToCart(c *gin.Context) {
 	db.DB.Where("cart_id = ?", cart.ID).Find(&cartItems)
 
 	if len(cartItems) > 3 {
-		callSuggestionsEndpoint(userID)
+		callSuggestionsEndpoint(userID, authToken)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Item added to cart"})
