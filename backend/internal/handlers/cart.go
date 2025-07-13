@@ -3,10 +3,38 @@ package handlers
 import (
 	"backend/internal/db"
 	"backend/internal/models"
+	"bytes"
+	"encoding/json"
 	"net/http"
+	"os"
 
 	"github.com/gin-gonic/gin"
 )
+
+// Helper function to call suggestions endpoint
+func callSuggestionsEndpoint(userID uint) {
+	// Get the base URL (assuming it's the same server)
+	baseURL := os.Getenv("BASE_URL")
+	if baseURL == "" {
+		baseURL = "http://localhost:8080" // Default fallback
+	}
+
+	// Prepare request body for suggestions endpoint
+	reqBody := map[string]interface{}{
+		"user_id": userID,
+	}
+
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		// Log error but don't fail the cart operation
+		return
+	}
+
+	// Make async call to suggestions endpoint
+	go func() {
+		http.Post(baseURL+"/api/suggestions", "application/json", bytes.NewBuffer(body))
+	}()
+}
 
 func AddToCart(c *gin.Context) {
 	userID := c.MustGet("user_id").(uint)
@@ -41,9 +69,16 @@ func AddToCart(c *gin.Context) {
 		db.DB.Save(&item)
 	}
 
+	// Check cart size and call suggestions endpoint if > 3 items
+	var cartItems []models.CartItem
+	db.DB.Where("cart_id = ?", cart.ID).Find(&cartItems)
+
+	if len(cartItems) > 3 {
+		callSuggestionsEndpoint(userID)
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "Item added to cart"})
 }
-
 
 func GetCart(c *gin.Context) {
 	userID := c.MustGet("user_id").(uint)

@@ -30,6 +30,6 @@ func SetupRoutes(r *gin.Engine) {
 		api.POST("/cart/add", handlers.AddToCart)
 		api.DELETE("/cart/delete", handlers.RemoveFromCart)
 		//api.POST("/event/cart-update", handlers.NotifyCartUpdate)
-		//api.GET("/suggestions", handlers.GetSuggestions)
+		api.GET("/suggestions", handlers.GetSuggestions)
 	}
 }
