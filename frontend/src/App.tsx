@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
 import Home from "./pages/Home";
 import Products from "./pages/Products";
 import Login from "./pages/Login";
+import ShowSuggestions from "./pages/ShowSuggestions";
 import ProtectedRoute from "./ProtectedRoute";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import Cart from "./pages/Cart";
@@ -95,6 +96,14 @@ export default function App() {
                 element={
                   <ProtectedRoute>
                     <Cart />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/show-suggestions"
+                element={
+                  <ProtectedRoute>
+                    <ShowSuggestions />
                   </ProtectedRoute>
                 }
               />

@@ -60,6 +60,15 @@ func AddToCart(c *gin.Context) {
 		db.DB.Create(&cart)
 	}
 
+	// Store the old total quantity before adding
+	var oldCartItems []models.CartItem
+	db.DB.Where("cart_id = ?", cart.ID).Find(&oldCartItems)
+
+	oldTotalQuantity := 0
+	for _, cartItem := range oldCartItems {
+		oldTotalQuantity += cartItem.Quantity
+	}
+
 	var item models.CartItem
 	err := db.DB.Where("cart_id = ? AND product_id = ?", cart.ID, input.ProductID).First(&item).Error
 	if err != nil {
@@ -74,11 +83,18 @@ func AddToCart(c *gin.Context) {
 		db.DB.Save(&item)
 	}
 
-	// Check cart size and call suggestions endpoint if > 3 items
+	// Check cart size and call suggestions endpoint if exactly 4 items total
 	var cartItems []models.CartItem
 	db.DB.Where("cart_id = ?", cart.ID).Find(&cartItems)
 
-	if len(cartItems) > 3 {
+	// Calculate total quantity
+	totalQuantity := 0
+	for _, cartItem := range cartItems {
+		totalQuantity += cartItem.Quantity
+	}
+
+	// Only trigger suggestions if we just reached exactly 4 items (not if we already had 4+)
+	if oldTotalQuantity < 4 && totalQuantity == 4 {
 		callSuggestionsEndpoint(userID, authToken)
 	}
 

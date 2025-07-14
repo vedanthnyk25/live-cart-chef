@@ -1,13 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../api";
 import type { Product } from "../types";
 import { useAuth } from "../context/AuthContext";
 
 export default function Products() {
   const { token } = useAuth();
+  const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
   const [error, setError] = useState<string>("");
   const [message, setMessage] = useState<string>("");
+  const [suggestionsAvailable, setSuggestionsAvailable] = useState<boolean>(false);
+  const [isPolling, setIsPolling] = useState<boolean>(false);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -22,8 +27,96 @@ export default function Products() {
         setError(err.response?.data?.error || "Failed to fetch products");
       }
     };
+
+    const checkSuggestionsAvailability = async () => {
+      try {
+        const res = await api.get("/api/suggestions/available", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        setSuggestionsAvailable(res.data.available);
+        console.log("Initial suggestions availability:", res.data.available);
+      } catch (err: any) {
+        console.error("Error checking initial suggestions:", err);
+        // Silently fail - suggestions availability is not critical
+      }
+    };
+
     fetchProducts();
+    checkSuggestionsAvailability();
   }, [token]);
+
+  // Cleanup polling on component unmount
+  useEffect(() => {
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+    };
+  }, []);
+
+  const startPollingForSuggestions = () => {
+    if (isPolling) {
+      console.log("Already polling, skipping...");
+      return; // Already polling
+    }
+    
+    console.log("Starting polling for suggestions...");
+    setIsPolling(true);
+    setMessage("Generating recipe suggestions... Please wait.");
+    
+    let pollCount = 0;
+    const maxPolls = 30; // Poll for up to 30 seconds (30 * 1000ms)
+    
+    pollingIntervalRef.current = setInterval(async () => {
+      pollCount++;
+      console.log(`Polling attempt ${pollCount}/${maxPolls}`);
+      
+      try {
+        const res = await api.get("/api/suggestions/available", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        
+        console.log("Suggestions available:", res.data.available);
+        
+        if (res.data.available) {
+          console.log("Suggestions found! Stopping polling.");
+          setSuggestionsAvailable(true);
+          setMessage("Recipe suggestions are ready! Click the suggestions button to view them.");
+          setIsPolling(false);
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+          }
+          
+          // Clear success message after 5 seconds
+          setTimeout(() => setMessage(""), 5000);
+        } else if (pollCount >= maxPolls) {
+          console.log("Max polls reached, stopping...");
+          // Stop polling after max attempts
+          setIsPolling(false);
+          setMessage("Recipe suggestions are taking longer than expected. Please try again later.");
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+          }
+          
+          // Clear message after 5 seconds
+          setTimeout(() => setMessage(""), 5000);
+        }
+      } catch (err: any) {
+        console.error("Error during polling:", err);
+        // Continue polling even if there's an error
+        if (pollCount >= maxPolls) {
+          setIsPolling(false);
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+          }
+        }
+      }
+    }, 1000); // Poll every second
+  };
 
   const handleAddToCart = async (productId: number) => {
     try {
@@ -36,6 +129,47 @@ export default function Products() {
       setTimeout(() => {
         setMessage("");
       }, 3000);
+
+      // Check if suggestions are now available after adding to cart
+      try {
+        const res = await api.get("/api/suggestions/available", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        setSuggestionsAvailable(res.data.available);
+        console.log("Suggestions available after adding to cart:", res.data.available);
+        
+        // If suggestions are not available yet, start polling
+        // This happens when we've just added the 4th item and suggestions are being generated
+        if (!res.data.available) {
+          // Check cart size to see if we should start polling
+          const cartRes = await api.get("/api/cart", {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          
+          const cartItems = cartRes.data.items || [];
+          // Calculate total quantity
+          const totalQuantity = cartItems.reduce((sum: number, item: any) => sum + item.quantity, 0);
+          
+          console.log("Cart items:", cartItems);
+          console.log("Total quantity:", totalQuantity);
+          
+          if (totalQuantity >= 4) {
+            console.log("Total quantity >= 4, starting polling for suggestions...");
+            startPollingForSuggestions();
+          } else {
+            console.log("Total quantity < 4, not polling yet");
+          }
+        } else {
+          console.log("Suggestions already available, no need to poll");
+        }
+      } catch (err: any) {
+        console.error("Error checking suggestions:", err);
+        // Silently fail - suggestions availability is not critical
+      }
     } catch (err: any) {
       setError(err.response?.data?.error || "Failed to add product to cart");
     }
@@ -56,8 +190,27 @@ export default function Products() {
         </div>
       )}
       {message && (
-        <div className="bg-green-50 border border-green-200 rounded-md p-4 mb-6">
-          <p className="text-green-600">{message}</p>
+        <div className={`border rounded-md p-4 mb-6 ${
+          message.includes("recipe suggestions") && message.includes("ready") 
+            ? "bg-green-50 border-green-200" 
+            : message.includes("Generating recipe suggestions")
+            ? "bg-blue-50 border-blue-200"
+            : "bg-green-50 border-green-200"
+        }`}>
+          <div className="flex items-center">
+            {message.includes("Generating recipe suggestions") && (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+            )}
+            <p className={`${
+              message.includes("recipe suggestions") && message.includes("ready")
+                ? "text-green-600"
+                : message.includes("Generating recipe suggestions")
+                ? "text-blue-600"
+                : "text-green-600"
+            }`}>
+              {message}
+            </p>
+          </div>
         </div>
       )}
 
@@ -111,6 +264,21 @@ export default function Products() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+      
+      {/* Suggestions Button */}
+      {suggestionsAvailable && (
+        <div className="fixed bottom-4 left-4 z-50">
+          <button
+            onClick={() => navigate("/show-suggestions")}
+            className="bg-orange-500 text-white px-6 py-3 rounded-full shadow-lg hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-colors font-medium flex items-center space-x-2 animate-pulse"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+            </svg>
+            <span>Suggestions</span>
+          </button>
         </div>
       )}
     </div>

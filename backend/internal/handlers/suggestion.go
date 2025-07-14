@@ -161,7 +161,77 @@ func GetSuggestions(c *gin.Context) {
 		return
 	}
 
+	// Store suggestions in database
+	userIDVal := userID.(uint)
+	
+	// Clear existing suggestions for this user
+	db.DB.Where("user_id = ?", userIDVal).Delete(&models.UserSuggestion{})
+	
+	// Insert new suggestions
+	for _, suggestion := range suggestions {
+		userSuggestion := models.UserSuggestion{
+			UserID:     userIDVal,
+			DishName:   suggestion.DishName,
+			ExtraItems: suggestion.ExtraItemsRequired,
+		}
+		db.DB.Create(&userSuggestion)
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"suggestions": suggestions,
 	})
+}
+
+func GetStoredSuggestions(c *gin.Context) {
+	userID, ok := c.Get("user_id")
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User ID missing"})
+		return
+	}
+
+	var userSuggestions []models.UserSuggestion
+	err := db.DB.Where("user_id = ?", userID).Find(&userSuggestions).Error
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch suggestions"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"suggestions": userSuggestions,
+	})
+}
+
+func CheckSuggestionsAvailable(c *gin.Context) {
+	userID, ok := c.Get("user_id")
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User ID missing"})
+		return
+	}
+
+	var count int64
+	db.DB.Model(&models.UserSuggestion{}).Where("user_id = ?", userID).Count(&count)
+
+	c.JSON(http.StatusOK, gin.H{
+		"available": count > 0,
+	})
+}
+
+func ClearSuggestions(c *gin.Context) {
+    userID, ok := c.Get("user_id")
+    if !ok {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "User ID missing"})
+        return
+    }
+
+    // Delete all suggestions for this user
+    result := db.DB.Where("user_id = ?", userID).Delete(&models.UserSuggestion{})
+    if result.Error != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to clear suggestions"})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{
+        "message": "Suggestions cleared successfully",
+        "cleared_count": result.RowsAffected,
+    })
 }

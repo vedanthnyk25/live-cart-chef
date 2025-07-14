@@ -31,5 +31,8 @@ func SetupRoutes(r *gin.Engine) {
 		api.DELETE("/cart/delete", handlers.RemoveFromCart)
 		//api.POST("/event/cart-update", handlers.NotifyCartUpdate)
 		api.GET("/suggestions", handlers.GetSuggestions)
+		api.GET("/suggestions/stored", handlers.GetStoredSuggestions)
+		api.GET("/suggestions/available", handlers.CheckSuggestionsAvailable)
+		api.DELETE("/suggestions/clear", handlers.ClearSuggestions)
 	}
 }
